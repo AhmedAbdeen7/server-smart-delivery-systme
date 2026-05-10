@@ -122,13 +122,17 @@ app.post("/lock", (req, res) => {
   res.status(200).json({ status: "lock command queued" });
 });
 
-app.get("/command", (req, res) =>
-{
-  if (pending_command) {
-    const command_to_send = pending_command;
-    pending_command = null;
-    console.log(`[COMMAND] Sending command to ESP32-CAM: ${command_to_send}`);
-    res.json({ command: command_to_send });
+app.get("/command", (req, res) => {
+  const cmd = pendingCommand;
+  pendingCommand = "none";
+  console.log(`[COMMAND] ESP32-CAM polled. Sending: ${cmd}`);
+
+  if (cmd === "1") {
+    res.status(200).send("true");
+  } else if (cmd === "0") {
+    res.status(200).send("false");
+  } else {
+    res.status(200).send("none");
   }
 });
 
