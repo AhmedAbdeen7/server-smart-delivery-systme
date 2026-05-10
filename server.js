@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const IMAGES_DIR = path.join(__dirname, "received_images");
 
-const serviceAccount = require("./serviceAccountKey.json");
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
