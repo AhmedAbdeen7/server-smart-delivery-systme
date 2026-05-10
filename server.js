@@ -1,4 +1,6 @@
 const express = require("express");
+let fcmToken = null;
+
 const fs = require("fs");
 const path = require("path");
 const admin = require("firebase-admin");
@@ -298,6 +300,17 @@ app.get("/gallery", (req, res) => {
 </body>
 </html>`);
   });
+});
+
+app.post("/register-token", express.json(), (req, res) => {
+  const { token } = req.body;
+  if (token) {
+    fcmToken = token;
+    console.log("[TOKEN] FCM token registered");
+    res.status(200).json({ received: true });
+  } else {
+    res.status(400).json({ error: "No token provided" });
+  }
 });
 
 app.delete("/images/:filename", (req, res) => {
