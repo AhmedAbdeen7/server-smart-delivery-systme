@@ -15,6 +15,7 @@ app.post("/upload", (req, res) => {
   const timestamp = req.headers["x-timestamp"] || `no-timestamp-${Date.now()}`;
   const filename = `image_${timestamp}.jpg`;
   const filepath = path.join(IMAGES_DIR, filename);
+  pendingCommand = "none";
 
   const chunks = [];
 
