@@ -1,14 +1,43 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
+const admin = require("firebase-admin");
 
 const app = express();
 
 const PORT = process.env.PORT || 8080;
 const IMAGES_DIR = path.join(__dirname, "received_images");
 
+const serviceAccount = require("./serviceAccountKey.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+const FCM_TOKEN = "dySokNrxH0uziWD66hkMCF:APA91bH3ss8TqOp6ZeeUpNOHeP-nA9JtxyllbnOfBu_QBEvV0n-99waZBpUZ-YiE7oMzK2U7fDxE3mY1k58IOgHmmpZ4L-lJzGl31kefKaCuYUaVIy5Y-2E";
+
+let pendingCommand = "none";
+let lockStatus = "locked";
+
 if (!fs.existsSync(IMAGES_DIR)) {
   fs.mkdirSync(IMAGES_DIR);
+}
+
+async function sendPushNotification(timestamp) {
+  const message = {
+    notification: {
+      title: "New Delivery! 📦",
+      body: `Someone is at your door — ${timestamp}`,
+    },
+    token: FCM_TOKEN,
+  };
+
+  try {
+    await admin.messaging().send(message);
+    console.log("[NOTIFY] Push notification sent!");
+  } catch (err) {
+    console.error("[NOTIFY] Failed:", err.message);
+  }
 }
 
 app.post("/upload", (req, res) => {
@@ -36,6 +65,7 @@ app.post("/upload", (req, res) => {
       }
 
       console.log(`[UPLOAD] Saved: ${filename} (${imageBuffer.length} bytes)`);
+      sendPushNotification(timestamp);
       res.status(200).send("Image received");
     });
   });
@@ -110,14 +140,14 @@ app.get("/latest", (req, res) => {
 });
 
 app.post("/unlock", (req, res) => {
-  pendingCommand = "1";  // 1 = unlock
+  pendingCommand = "1";
   lockStatus = "unlocked";
   console.log("[COMMAND] Unlock requested by mobile app");
   res.status(200).json({ status: "unlock command queued" });
 });
 
 app.post("/lock", (req, res) => {
-  pendingCommand = "0";  // 0 = lock
+  pendingCommand = "0";
   lockStatus = "locked";
   console.log("[COMMAND] Lock requested by mobile app");
   res.status(200).json({ status: "lock command queued" });
@@ -137,7 +167,6 @@ app.get("/command", (req, res) => {
   }
 });
 
-
 app.post("/status", express.json(), (req, res) => {
   const { status } = req.body;
   if (status === "locked" || status === "unlocked") {
@@ -149,29 +178,26 @@ app.post("/status", express.json(), (req, res) => {
   }
 });
 
-
 app.get("/status", (req, res) => {
   res.status(200).json({ status: lockStatus });
 });
 
-
 app.get("/gallery", (req, res) => {
   fs.readdir(IMAGES_DIR, (err, files) => {
     if (err) return res.status(500).send("Could not read images directory");
- 
+
     const host = req.headers.host;
     const protocol = req.headers["x-forwarded-proto"] || "http";
- 
+
     const jpegFiles = files
       .filter((f) => f.endsWith(".jpg"))
       .sort()
       .reverse();
- 
+
     const imageCards = jpegFiles.map((filename) => {
       const timestamp = filename.replace("image_", "").replace(".jpg", "");
       const url = `${protocol}://${host}/images/${filename}`;
- 
-      // Format timestamp for display
+
       let displayTime = timestamp;
       try {
         const [datePart, timePart] = timestamp.split("T");
@@ -180,18 +206,17 @@ app.get("/gallery", (req, res) => {
         const months = ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
         displayTime = `${months[parseInt(m)]} ${d}, ${y} — ${hh}:${mm}:${ss}`;
       } catch (_) {}
- 
       return `
         <div class="card" onclick="openModal('${url}', '${displayTime}')">
           <img src="${url}" alt="${displayTime}" loading="lazy" />
           <div class="timestamp">${displayTime}</div>
         </div>`;
     }).join("");
- 
+
     const empty = jpegFiles.length === 0
       ? `<div class="empty">📭 No images yet. Waiting for deliveries...</div>`
       : "";
- 
+
     res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -229,7 +254,6 @@ app.get("/gallery", (req, res) => {
     .empty {
       text-align: center; padding: 80px 20px; color: #999; font-size: 18px;
     }
-    /* Modal */
     .modal {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,0.85); z-index: 100;
@@ -252,15 +276,14 @@ app.get("/gallery", (req, res) => {
     </div>
     <div class="badge">● Live</div>
   </header>
- 
+
   <div class="grid">${imageCards}${empty}</div>
- 
+
   <div class="modal" id="modal" onclick="closeModal()">
     <span class="close">✕</span>
     <img id="modalImg" src="" alt="" />
     <div class="caption" id="modalCaption"></div>
   </div>
- 
   <script>
     function openModal(url, caption) {
       document.getElementById('modalImg').src = url;
@@ -270,7 +293,6 @@ app.get("/gallery", (req, res) => {
     function closeModal() {
       document.getElementById('modal').classList.remove('open');
     }
-    // Auto-refresh every 5 seconds
     setTimeout(() => location.reload(), 5000);
   </script>
 </body>
@@ -278,20 +300,46 @@ app.get("/gallery", (req, res) => {
   });
 });
 
+app.delete("/images/:filename", (req, res) => {
+  const filename = req.params.filename;
+
+  if (filename.includes("/") || filename.includes("..")) {
+    return res.status(400).send("Invalid filename");
+  }
+
+  const filepath = path.join(IMAGES_DIR, filename);
+
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).send("Image not found");
+  }
+
+  fs.unlink(filepath, (err) => {
+    if (err) return res.status(500).send("Failed to delete image");
+    console.log(`[DELETE] Removed: ${filename}`);
+    res.status(200).send("Image deleted");
+  });
+});
 
 app.get("/", (req, res) => {
-  res.send("Smart Delivery Lock Box Server is running ");
+  res.send("Smart Delivery Lock Box Server is running");
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`\n=== Smart Delivery Lock Box Server`);
+  console.log(`\n=== Smart Delivery Lock Box Server ===`);
   console.log(`Listening on port ${PORT}`);
   console.log(`Images saved to: ${IMAGES_DIR}`);
   console.log(`\nEndpoints:`);
-  console.log(`  POST /upload          <- ESP32-CAM sends images here`);
-  console.log(`  GET  /images          <- list all images (JSON)`);
-  console.log(`  GET  /images/:file    <- fetch a specific image`);
-  console.log(`  GET  /latest          <- fetch the most recent image`);
-  console.log(`  GET  /               <- health check`);
+  console.log(`  POST /upload`);
+  console.log(`  GET  /images`);
+  console.log(`  GET  /images/:file`);
+  console.log(`  GET  /latest`);
+  console.log(`  POST /unlock`);
+  console.log(`  POST /lock`);
+  console.log(`  GET  /command`);
+  console.log(`  POST /status`);
+  console.log(`  GET  /status`);
+  console.log(`  GET  /gallery`);
+  console.log(`  DELETE /images/:file`);
+  console.log(`  GET  /`);
   console.log(`\nWaiting for images...\n`);
 });
