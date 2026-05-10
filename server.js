@@ -26,14 +26,17 @@ if (!fs.existsSync(IMAGES_DIR)) {
 }
 
 async function sendPushNotification(timestamp) {
+  if (!fcmToken) {
+    console.warn("[NOTIFY] No FCM token registered yet");
+    return;
+  }
   const message = {
     notification: {
-      title: "New Delivery! 📦",
-      body: `Someone is at your door — ${timestamp}`,
+      title: "New Delivery!",
+      body: `Someone is at your door`,
     },
-    token: FCM_TOKEN,
+    token: fcmToken,
   };
-
   try {
     await admin.messaging().send(message);
     console.log("[NOTIFY] Push notification sent!");
@@ -41,7 +44,6 @@ async function sendPushNotification(timestamp) {
     console.error("[NOTIFY] Failed:", err.message);
   }
 }
-
 app.post("/upload", (req, res) => {
   const timestamp = req.headers["x-timestamp"] || `no-timestamp-${Date.now()}`;
   const filename = `image_${timestamp}.jpg`;
