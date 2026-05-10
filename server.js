@@ -108,19 +108,18 @@ app.get("/latest", (req, res) => {
   });
 });
 
-app.post("/unlock", (req, res) =>
-{
-  pending_command = "unlock";
+app.post("/unlock", (req, res) => {
+  pendingCommand = "1";  // 1 = unlock
+  lockStatus = "unlocked";
   console.log("[COMMAND] Unlock requested by mobile app");
-  res.status(200).json({status : "unlock command queued"});
-
+  res.status(200).json({ status: "unlock command queued" });
 });
 
-app.post("/lock", (req, res) =>
-{
-  pending_command = "lock";
+app.post("/lock", (req, res) => {
+  pendingCommand = "0";  // 0 = lock
+  lockStatus = "locked";
   console.log("[COMMAND] Lock requested by mobile app");
-  res.status(200).json({status : "lock command queued"});
+  res.status(200).json({ status: "lock command queued" });
 });
 
 app.get("/command", (req, res) =>
