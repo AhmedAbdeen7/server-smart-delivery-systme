@@ -128,13 +128,19 @@ app.get("/latest", (req, res) => {
   fs.readdir(IMAGES_DIR, (err, files) => {
     if (err) return res.status(500).send("Could not read images directory");
 
-    const jpegFiles = files.filter((f) => f.endsWith(".jpg")).sort();
-
-    if (jpegFiles.length === 0) {
-      return res.status(404).send("No images yet");
-    }
-
-    const latest = jpegFiles[jpegFiles.length - 1];
+  const jpegFiles = files
+    .filter((f) => f.endsWith(".jpg"))
+    .sort((a, b) => {
+      const statA = fs.statSync(path.join(IMAGES_DIR, a)).mtimeMs;
+      const statB = fs.statSync(path.join(IMAGES_DIR, b)).mtimeMs;
+      return statB - statA;
+    });
+  
+  if (jpegFiles.length === 0) {
+    return res.status(404).send("No images yet");
+  }
+  
+  const latest = jpegFiles[0];
     const filepath = path.join(IMAGES_DIR, latest);
 
     res.setHeader("Content-Type", "image/jpeg");
