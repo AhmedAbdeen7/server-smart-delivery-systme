@@ -193,10 +193,13 @@ app.get("/gallery", (req, res) => {
     const host = req.headers.host;
     const protocol = req.headers["x-forwarded-proto"] || "http";
 
-    const jpegFiles = files
-      .filter((f) => f.endsWith(".jpg"))
-      .sort()
-      .reverse();
+  const jpegFiles = files
+    .filter((f) => f.endsWith(".jpg"))
+    .sort((a, b) => {
+      const statA = fs.statSync(path.join(IMAGES_DIR, a)).mtimeMs;
+      const statB = fs.statSync(path.join(IMAGES_DIR, b)).mtimeMs;
+      return statB - statA;
+    });
 
     const imageCards = jpegFiles.map((filename) => {
       const timestamp = filename.replace("image_", "").replace(".jpg", "");
