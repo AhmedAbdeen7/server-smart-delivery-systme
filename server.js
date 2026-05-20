@@ -1,5 +1,6 @@
 const express = require("express");
 let fcmToken = null;
+const sharp = require("sharp");
 
 const fs = require("fs");
 const path = require("path");
@@ -62,12 +63,14 @@ app.post("/upload", (req, res) => {
       return res.status(400).send("Empty image body");
     }
 
-    fs.writeFile(filepath, imageBuffer, (err) => {
+  sharp(imageBuffer)
+    .rotate(180)
+    .toFile(filepath, (err) => {
       if (err) {
         console.error(`[UPLOAD] Failed to save image: ${err.message}`);
         return res.status(500).send("Failed to save image");
       }
-
+  
       console.log(`[UPLOAD] Saved: ${filename} (${imageBuffer.length} bytes)`);
       sendPushNotification(timestamp);
       res.status(200).send("Image received");
